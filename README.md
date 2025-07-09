@@ -13,7 +13,7 @@
 <!-- ABOUT THE PROJECT -->
 ## Project Screenshot
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+![Product Name Screen Shot][product-screenshot]
 
 
 ### Built With

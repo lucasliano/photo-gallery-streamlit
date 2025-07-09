@@ -1,2 +1,4 @@
 streamlit 
 pillow
+qreader==3.16
+qrcode==8.2

@@ -1,8 +1,9 @@
+from utils.image_processing import process_image
+from datetime import datetime
 import streamlit as st
-import os
 from PIL import Image
 import sqlite3
-from datetime import datetime
+import os
 
 # --- Configuración ---
 IMAGES_DIR = "images"
@@ -26,16 +27,29 @@ def init_db():
     conn.close()
 
 # --- Guardar metadata en base de datos ---
-def save_metadata(filename, author, title):
+def save_metadata(image, author, title):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
     c.execute('''
         INSERT INTO photos (filename, author, title, date_uploaded)
         VALUES (?, ?, ?, ?)
-    ''', (filename, author, title, hora_actual))
+    ''', ("", author, title, hora_actual))  # Filename se actualiza luego
+    photo_id = c.lastrowid
+    conn.commit()
+    
+    filename = f"{photo_id}.jpg"         # Guardamos la foto con el ID de la db
+    filepath = os.path.join(IMAGES_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(image.getbuffer())
+
+    c.execute('''
+        UPDATE photos SET filename = ? WHERE id = ?
+    ''', (filename, photo_id))
     conn.commit()
     conn.close()
+
+    return filepath
 
 # --- Obtener metadata ---
 def get_photos():
@@ -55,36 +69,30 @@ def count_photos():
     conn.close()
     return count
 
-
 # --- Interfaz Streamlit ---
 st.set_page_config(page_title="Galería", layout="wide")
-# st.title("")
-st.markdown("<h1 style='text-align: center;'>Cumple 28 🎂</h1>", unsafe_allow_html=True)
-
+st.markdown("<h1 style='text-align: center;'> Generador de Dataset</h1>", unsafe_allow_html=True)
 
 init_db()
 
 # --- Subida desde cámara o galería ---
 with st.expander("📤 Subir una imagen (cámara o galería)"):
     st.markdown("### Elegí una imagen")
-    image_file = st.file_uploader("📁 Desde tu galería", type=["jpg", "jpeg", "png"])
-    # image_camera = st.camera_input("📷 O sacá una foto")
+    image = st.file_uploader("📁 Desde tu galería", type=["jpg", "jpeg", "png"])
 
     st.markdown("### Completá los datos")
     author = st.text_input("Autor")
     title = st.text_input("Título")
 
-    image = image_file #or image_camera  # Usar cualquiera
-
     if image and author and title:
         if st.button("Subir"):
-            # Generar nombre único
-            filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
-            filepath = os.path.join(IMAGES_DIR, filename)
-            with open(filepath, "wb") as f:
-                f.write(image.getbuffer())
-            save_metadata(filename, author, title)
-            st.success("Imagen subida correctamente")
+            try:
+                image_filepath = save_metadata(image, author, title)
+                result_data = process_image(image_filepath)
+
+                st.success(f"Imagen subida correctamente. Charuco Detected: {result_data['charuco_detected']}, QRs detected: {result_data['qr_codes_json']}")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
 # --- Mostrar galería ---
 st.markdown("## 📸 Galería")
